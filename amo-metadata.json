@@ -3,13 +3,29 @@
     "license": "MIT"
   },
   "categories": {
-    "firefox": ["photos-music-videos"]
+    "firefox": [
+      "photos-music-videos"
+    ]
+  },
+  "default_locale": "en-US",
+  "name": {
+    "en-US": "Media Tamer"
   },
   "summary": {
-    "en-US": "Control media volume, speed, night mode, seeking, and Media Roller downloads."
+    "en-US": "Tame web videos with safer seek keys, volume boost, speed control, night mode, seek undo, and optional Media Roller downloads."
+  },
+  "description": {
+    "en-US": "Media Tamer gives Firefox a compact control layer for web media.\n\nUse it to:\n\n* prevent accidental number-key seeks while typing or using page shortcuts\n* boost or normalize video volume and compress sudden loud audio\n* adjust playback speed without digging through each site's player controls\n* undo accidental seek jumps\n* dim bright video pages with night mode\n* optionally send supported media to your own Media Roller download server\n\nThe extension is designed for local, user-controlled playback tweaks. It does not require an account, does not include ads, and the optional download helper only runs when you configure and use your own Media Roller server."
+  },
+  "developer_comments": {
+    "en-US": "Media Tamer is a focused Firefox extension for media playback controls. Optional download support requires the user to configure their own Media Roller server; no bundled third-party service or paid account is required."
   },
   "homepage": {
     "en-US": "https://github.com/ajh13/media-tamer"
   },
-  "requires_payment": false
+  "support_url": {
+    "en-US": "https://github.com/ajh13/media-tamer/issues"
+  },
+  "requires_payment": false,
+  "is_experimental": false
 }

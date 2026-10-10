@@ -16,8 +16,8 @@
     "audit": "npm audit --omit=dev",
     "audit:full": "npm audit",
     "build": "node scripts/build.cjs",
-    "sign:amo:listed": "npx --yes web-ext@latest sign --source-dir extensions/media-tamer --artifacts-dir dist/amo --channel=listed --amo-metadata amo-metadata.json --api-key=\"$AMO_JWT_ISSUER\" --api-secret=\"$AMO_JWT_SECRET\" --approval-timeout=900000 --no-input",
-    "sign:amo:unlisted": "npx --yes web-ext@latest sign --source-dir extensions/media-tamer --artifacts-dir dist/amo --channel=unlisted --api-key=\"$AMO_JWT_ISSUER\" --api-secret=\"$AMO_JWT_SECRET\" --approval-timeout=900000 --no-input"
+    "sign:amo:listed": "npx --yes web-ext@latest sign --source-dir extensions/media-tamer --artifacts-dir dist/amo --channel=listed --amo-metadata amo-metadata.json --api-key=\"$AMO_JWT_ISSUER\" --api-secret=\"$AMO_JWT_SECRET\" --approval-timeout=3600000 --no-input",
+    "sign:amo:unlisted": "npx --yes web-ext@latest sign --source-dir extensions/media-tamer --artifacts-dir dist/amo --channel=unlisted --api-key=\"$AMO_JWT_ISSUER\" --api-secret=\"$AMO_JWT_SECRET\" --approval-timeout=3600000 --no-input"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",
