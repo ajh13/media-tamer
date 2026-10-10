@@ -1,0 +1,13 @@
+node_modules/
+*.log
+build/
+dist/
+*.xpi
+*.zip
+playwright-report/
+test-results/
+artifacts/
+# Isolated browser binaries and disposable extension test profiles.
+ff-cache/
+.browser-cache/
+.e2e-work/

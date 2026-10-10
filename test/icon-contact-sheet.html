@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Icon Contact Sheet — Bold Play A</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, sans-serif; padding: 24px; background: #f5f5f5; color: #222; }
+  h1 { font-size: 18px; margin-bottom: 4px; }
+  .sub { font-size: 12px; color: #666; margin-bottom: 20px; }
+  .row { display: flex; gap: 24px; margin-bottom: 24px; }
+  .strip {
+    flex: 1;
+    border-radius: 8px;
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    border: 1px solid #ddd;
+  }
+  .strip.light { background: #f3f4f6; color: #252a32; }
+  .strip.dark { background: #262830; color: #f4f5f7; border-color: #464954; }
+  .label { font-size: 11px; min-width: 90px; }
+  .icon { display: block; image-rendering: pixelated; }
+  .sizes { display: flex; gap: 12px; align-items: center; }
+  .size-label { font-size: 10px; color: #888; text-align: center; margin-top: 2px; }
+  .size-cell { text-align: center; }
+  .checker {
+    background-image:
+      linear-gradient(45deg, #ccc 25%, transparent 25%),
+      linear-gradient(-45deg, #ccc 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #ccc 75%),
+      linear-gradient(-45deg, transparent 75%, #ccc 75%);
+    background-size: 8px 8px;
+    background-position: 0 0, 0 4px, 4px -4px, -4px 0px;
+    display: inline-block;
+    padding: 0;
+  }
+  .section { margin-bottom: 32px; }
+  h2 { font-size: 14px; margin-bottom: 10px; border-bottom: 1px solid #ddd; padding-bottom: 4px; }
+</style>
+</head>
+<body>
+<h1>Icon Contact Sheet — Bold Play (Option A)</h1>
+<p class="sub">All sizes on light/dark toolbar backgrounds + transparency checker</p>
+
+<div class="section">
+<h2>Toolbar simulation (light theme — dark strokes)</h2>
+<div class="row">
+  <div class="strip light">
+    <span class="label">Light toolbar</span>
+    <div class="sizes">
+      <div class="size-cell"><img class="icon" src="../extensions/media-tamer/icon-16-dark.png" width="16" height="16"><div class="size-label">16px</div></div>
+      <div class="size-cell"><img class="icon" src="../extensions/media-tamer/icon-32-dark.png" width="32" height="32"><div class="size-label">32px</div></div>
+      <div class="size-cell"><img class="icon" src="../extensions/media-tamer/icon-48-dark.png" width="48" height="48"><div class="size-label">48px</div></div>
+      <div class="size-cell"><img class="icon" src="../extensions/media-tamer/icon-96-dark.png" width="96" height="96"><div class="size-label">96px</div></div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="section">
+<h2>Toolbar simulation (dark theme — light strokes)</h2>
+<div class="row">
+  <div class="strip dark">
+    <span class="label">Dark toolbar</span>
+    <div class="sizes">
+      <div class="size-cell"><img class="icon" src="../extensions/media-tamer/icon-16-light.png" width="16" height="16"><div class="size-label">16px</div></div>
+      <div class="size-cell"><img class="icon" src="../extensions/media-tamer/icon-32-light.png" width="32" height="32"><div class="size-label">32px</div></div>
+      <div class="size-cell"><img class="icon" src="../extensions/media-tamer/icon-48-light.png" width="48" height="48"><div class="size-label">48px</div></div>
+      <div class="size-cell"><img class="icon" src="../extensions/media-tamer/icon-96-light.png" width="96" height="96"><div class="size-label">96px</div></div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="section">
+<h2>Transparency check (checker background)</h2>
+<div class="row">
+  <div class="strip checker">
+    <span class="label" style="color:#333">Checker</span>
+    <div class="sizes">
+      <div class="size-cell"><span class="checker"><img class="icon" src="../extensions/media-tamer/icon-16-dark.png" width="32" height="32"></span><div class="size-label">16→32</div></div>
+      <div class="size-cell"><span class="checker"><img class="icon" src="../extensions/media-tamer/icon-32-dark.png" width="32" height="32"></span><div class="size-label">32px</div></div>
+      <div class="size-cell"><span class="checker"><img class="icon" src="../extensions/media-tamer/icon-48-dark.png" width="48" height="48"></span><div class="size-label">48px</div></div>
+      <div class="size-cell"><span class="checker"><img class="icon" src="../extensions/media-tamer/icon-96-dark.png" width="96" height="96"></span><div class="size-label">96px</div></div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="section">
+<h2>Fallback icons (icon-48.png, icon-96.png — dark variant)</h2>
+<div class="row">
+  <div class="strip light">
+    <span class="label">Fallback</span>
+    <div class="sizes">
+      <div class="size-cell"><img class="icon" src="../extensions/media-tamer/icon-48.png" width="48" height="48"><div class="size-label">48px</div></div>
+      <div class="size-cell"><img class="icon" src="../extensions/media-tamer/icon-96.png" width="96" height="96"><div class="size-label">96px</div></div>
+    </div>
+  </div>
+</div>
+</div>
+
+</body>
+</html>

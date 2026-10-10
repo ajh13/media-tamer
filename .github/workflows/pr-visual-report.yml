@@ -1,0 +1,66 @@
+# PR Visual Report — trusted reporter workflow.
+#
+# Triggers on workflow_run completion of the PR Visual Capture workflow.
+# Runs from main with pull-requests:write and actions:read permissions.
+# Never checks out PR code or downloads artifact contents.
+#
+# SECURITY:
+#   - Only triggers from the trusted capture workflow on main.
+#   - Validates the capture run via API (repo, workflow path, event, conclusion).
+#   - Validates the associated PR via API (open state, head SHA match).
+#   - Validates artifact name via API (prefix check, never downloads contents).
+#   - Posts/updates a comment identified by a unique marker.
+#   - Fork support: searches open PRs by head SHA when pull_requests array is empty.
+#
+# See docs/pr-visuals.md for full design.
+
+name: PR Visual Report
+
+on:
+  workflow_run:
+    workflows: ["PR Visual Capture"]
+    types:
+      - completed
+
+# Trusted: needs to write PR comments and read workflow run metadata.
+permissions:
+  contents: read
+  pull-requests: write
+  actions: read
+
+concurrency:
+  group: pr-visual-report-${{ github.event.workflow_run.id }}
+  cancel-in-progress: false
+
+jobs:
+  report:
+    # Only act on successful capture runs from the trusted workflow.
+    if: >-
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    env:
+      GITHUB_REPOSITORY: ${{ github.repository }}
+      CAPTURE_RUN_ID: ${{ github.event.workflow_run.id }}
+      CAPTURE_WORKFLOW_PATH: '.github/workflows/pr-visual-capture.yml'
+      EXPECTED_ARTIFACT_PREFIX: 'pr-visuals-'
+
+    steps:
+      - name: Checkout (scripts only — never PR code)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          sparse-checkout: |
+            scripts/pr-visual-report.mjs
+          sparse-checkout-cone-mode: false
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+
+      - name: Report visuals to PR
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/pr-visual-report.mjs

@@ -1,0 +1,55 @@
+# .github/dependabot.yml
+# Configure Dependabot version updates with grouped dependencies.
+# Docs: https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference
+
+version: 2
+updates:
+  # npm devDependencies — weekly grouped patch/minor updates
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+    # Group devDependencies for patch/minor to reduce PR noise
+    groups:
+      npm-dev-patch-minor:
+        applies-to: version-updates
+        dependency-type: "development"
+        update-types:
+          - "patch"
+          - "minor"
+    # Major updates are separate (manual review)
+    # Security updates bypass cooldown automatically (see docs link above)
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "npm"
+    # Ignore major bumps for certain packages (manual handling)
+    ignore:
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "prettier"
+        update-types: ["version-update:semver-major"]
+    cooldown:
+      default-days: 7
+
+  # GitHub Actions — manual review for supply chain security
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "github-actions"

@@ -1,0 +1,20 @@
+{
+  "name": "media-tamer-e2e",
+  "version": "1.0.0",
+  "private": false,
+  "description": "Isolated end-to-end test runner for the Video Controls anchored-popup path. Pinned harness, owned lock, owned browsers.",
+  "type": "commonjs",
+  "scripts": {
+    "test": "node scripts/baseline-runner.js",
+    "test:twice": "node scripts/baseline-runner.js && node scripts/baseline-runner.js",
+    "gen:media": "node scripts/gen-media-fixture.js",
+    "setup:browsers": "npx playwright install firefox"
+  },
+  "dependencies": {
+    "jszip": "3.10.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "firefox-webext-playwright-harness": "file:./scripts/firefox-webext-playwright-harness-0.3.0.tgz"
+  }
+}

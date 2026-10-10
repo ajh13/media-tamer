@@ -1,0 +1,31 @@
+{
+  "name": "media-tamer",
+  "version": "1.0.0",
+  "description": "Media Tamer — Firefox browser extension for video playback control (volume boost, speed, night mode, seek undo, media-roller download).",
+  "private": false,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/unit/*.test.js",
+    "test:browser": "node --test test/browser/extension.test.js test/browser/night-mode.test.js test/browser/popup-layout.test.js test/browser/popup-status-cleanup.test.js test/browser/popup-corner-spacing.test.js test/browser/popup-drag.test.js test/browser/popup-startup.test.js test/browser/block-number-toggle.test.js",
+    "test:all": "npm test && npm run test:browser",
+    "lint": "npm run lint:js && npm run lint:ext",
+    "lint:js": "eslint --max-warnings 0 extensions/media-tamer/*.js test/unit/*.js test/browser/*.js scripts/*.mjs",
+    "lint:ext": "node scripts/validate-extension.mjs",
+    "format:check": "prettier --check extensions/media-tamer/*.js test/unit/*.js test/browser/*.js scripts/*.mjs eslint.config.mjs .prettierrc.json",
+    "format": "prettier --write extensions/media-tamer/*.js test/unit/*.js test/browser/*.js scripts/*.mjs eslint.config.mjs .prettierrc.json",
+    "audit": "npm audit --omit=dev",
+    "audit:full": "npm audit",
+    "build": "node scripts/build.cjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "acorn": "8.18.0",
+    "eslint": "10.11.0",
+    "globals": "17.12.0",
+    "jsdom": "30.1.1",
+    "jszip": "3.10.2",
+    "playwright": "1.63.0",
+    "prettier": "3.9.9",
+    "selenium-webdriver": "4.49.0"
+  }
+}

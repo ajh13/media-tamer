@@ -1,0 +1,69 @@
+# PR Visual Capture — unprivileged workflow.
+#
+# Triggers on pull_request to main. Runs the visual capture script on the
+# PR's exact head commit. Uploads screenshots as workflow artifacts.
+#
+# SECURITY:
+#   - Uses pull_request event (NOT pull_request_target). PR code runs in this
+#     workflow, so it MUST be read-only with no secrets.
+#   - persist-credentials: false prevents GITHUB_TOKEN from leaking to PR code.
+#   - No secrets.* access. No write permissions.
+#   - Does NOT report to the PR — reporting is handled by the trusted
+#     pr-visual-report workflow via workflow_run trigger.
+#
+# See docs/pr-visuals.md for full design.
+
+name: PR Visual Capture
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+# READ-ONLY: no secrets, no write tokens. PR code executes here.
+permissions:
+  contents: read
+
+# Don't cancel on new pushes — let each run complete to avoid partial artifacts.
+concurrency:
+  group: pr-visual-capture-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+  cancel-in-progress: false
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout PR head (exact commit)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Firefox for Playwright
+        run: npx playwright install --with-deps firefox
+
+      - name: Capture popup screenshots
+        run: node scripts/visual-capture.mjs
+        env:
+          GITHUB_SHA: ${{ github.event.pull_request.head.sha }}
+          GITHUB_REF: ${{ github.event.pull_request.head.ref }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+
+      - name: Upload visual artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pr-visuals-${{ github.event.pull_request.head.sha }}
+          path: artifacts/visuals/
+          retention-days: 30

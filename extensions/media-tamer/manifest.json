@@ -1,0 +1,45 @@
+{
+  "manifest_version": 2,
+  "name": "Media Tamer",
+  "version": "1.2.2",
+  "description": "Prevent accidental number-key seeks, adjust video volume and speed, compress loud audio, undo seeks, and optionally download via your Media Roller server.",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "media-tamer@example.invalid",
+      "strict_min_version": "142.0",
+      "data_collection_permissions": {
+        "required": ["none"],
+        "optional": ["browsingActivity"]
+      }
+    }
+  },
+  "content_scripts": [{
+    "matches": ["http://*/*", "https://*/*"],
+    "js": ["content.js", "night-mode.js", "volume.js", "speed.js", "seek-undo.js"],
+    "all_frames": true,
+    "run_at": "document_start"
+  }],
+  "background": {
+    "scripts": ["media-roller.js", "background.js"],
+    "persistent": true
+  },
+  "page_action": {
+    "default_popup": "popup.html",
+    "default_title": "Media Tamer",
+    "default_icon": {
+      "16": "icon-16-dark.png",
+      "32": "icon-32-dark.png",
+      "48": "icon-48-dark.png",
+      "96": "icon-96-dark.png"
+    },
+    "show_matches": ["http://*/*", "https://*/*"]
+  },
+  "permissions": ["menus", "storage", "webNavigation", "activeTab", "theme"],
+  "optional_permissions": ["downloads"],
+  "icons": {
+    "16": "icon-16-dark.png",
+    "32": "icon-32-dark.png",
+    "48": "icon-48-dark.png",
+    "96": "icon-96-dark.png"
+  }
+}
