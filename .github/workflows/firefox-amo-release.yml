@@ -84,10 +84,18 @@ jobs:
       - name: Check AMO secrets
         if: env.REQUESTED_AMO_PUBLISH == 'true'
         run: |
+          AMO_JWT_ISSUER="$(printf '%s' "$AMO_JWT_ISSUER" | tr -d '\r\n' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+          AMO_JWT_SECRET="$(printf '%s' "$AMO_JWT_SECRET" | tr -d '\r\n' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+
           if [[ -z "$AMO_JWT_ISSUER" || -z "$AMO_JWT_SECRET" ]]; then
             echo 'AMO_JWT_ISSUER and AMO_JWT_SECRET GitHub Actions secrets are required to publish to AMO.' >&2
             exit 1
           fi
+
+          {
+            printf 'AMO_JWT_ISSUER=%s\n' "$AMO_JWT_ISSUER"
+            printf 'AMO_JWT_SECRET=%s\n' "$AMO_JWT_SECRET"
+          } >> "$GITHUB_ENV"
 
       - name: Submit listed release to AMO
         if: env.REQUESTED_AMO_PUBLISH == 'true' && env.REQUESTED_AMO_CHANNEL == 'listed'
