@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Media Tamer</title>
+    <link rel="stylesheet" href="popup.css" />
+    <style>
+      /* Feature2: hide benign "Applied/Active" status text — value already shown in .value label.
+         Real errors (data-status="error") and pending/needsInteraction messages remain visible. */
+      .status[data-status="ok"] { display: none !important; }
+    </style>
+  </head>
+  <body>
+    <main class="popup">
+      <!-- Volume -->
+      <div class="row" data-control="volume">
+        <button type="button" class="step minus" aria-label="Decrease volume">−</button>
+        <div class="surface hoverfill" id="volume-surface" style="--pct: 33.333%">
+          <div class="fill"></div>
+          <div class="tick"></div>
+          <div class="labels">
+            <span class="label">Volume</span>
+            <strong class="value" id="volume-value">100%</strong>
+          </div>
+          <input
+            type="range"
+            disabled
+            id="volume-slider"
+            class="overlay-range"
+            min="0"
+            max="300"
+            step="1"
+            value="100"
+            aria-label="Volume 0 to 300 percent"
+          />
+        </div>
+        <button type="button" class="step plus" aria-label="Increase volume">+</button>
+      </div>
+
+      <!-- Reduce volume peaks (Night mode internally) -->
+      <div class="row" data-control="peaks">
+        <button type="button" class="step minus" aria-label="Decrease peak reduction">−</button>
+        <div class="surface hoverfill" id="peaks-surface" style="--pct: 0%">
+          <div class="fill"></div>
+          <div class="tick"></div>
+          <div class="labels">
+            <span class="label">Reduce volume peaks</span>
+            <strong class="value" id="peaks-value">Off</strong>
+          </div>
+          <input
+            type="range"
+            disabled
+            id="peaks-slider"
+            class="overlay-range"
+            min="0"
+            max="100"
+            step="1"
+            value="0"
+            aria-label="Reduce volume peaks 0 to 100"
+          />
+        </div>
+        <button type="button" class="step plus" aria-label="Increase peak reduction">+</button>
+      </div>
+
+      <!-- Speed -->
+      <div class="row" data-control="speed">
+        <button type="button" class="step minus" aria-label="Decrease speed">−</button>
+        <div class="surface hoverfill" id="speed-surface" style="--pct: 27.273%">
+          <div class="fill"></div>
+          <div class="tick"></div>
+          <div class="labels">
+            <span class="label">Speed</span>
+            <strong class="value" id="speed-value">1.00x</strong>
+          </div>
+          <input
+            type="range"
+            disabled
+            id="speed-slider"
+            class="overlay-range"
+            min="0.25"
+            max="3"
+            step="0.05"
+            value="1"
+            aria-label="Speed 0.25 to 3"
+          />
+        </div>
+        <button type="button" class="step plus" aria-label="Increase speed">+</button>
+      </div>
+
+      <!-- Undo seek + Download -->
+      <div class="actions">
+        <button type="button" class="action-btn" id="seek-undo">↶ Undo seek</button>
+        <button type="button" class="action-btn" id="mr-download">↓ Download</button>
+      </div>
+
+      <!-- Reset all + Settings -->
+      <div class="bottom">
+        <button type="button" class="bottom-btn" id="reset-all">Reset all</button>
+        <button type="button" class="bottom-btn" id="settings-toggle" aria-expanded="false">Settings</button>
+      </div>
+
+      <!-- Settings disclosure: appearance, seek shortcut, media roller -->
+      <details class="settings-panel" id="settings-panel">
+        <summary class="settings-summary" hidden>Settings</summary>
+
+        <div class="settings-body">
+          <label class="settings-label" for="appearance-select">Appearance</label>
+          <select id="appearance-select" aria-label="Appearance">
+            <option value="system">System</option>
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select>
+
+          <!-- Seek shortcut capture -->
+          <div class="seek-row">
+            <span class="seek-label">Seek shortcut</span>
+            <output class="seek-binding" id="seek-binding">Ctrl+Z</output>
+            <button type="button" class="reset-btn" id="seek-capture" title="Change seek shortcut">Change</button>
+          </div>
+
+          <!-- Number-key seek block toggle -->
+          <div class="seek-row">
+            <span class="seek-label">Block number-key seeking (0–9)</span>
+            <input type="checkbox" id="block-number-keys" checked aria-label="Block number-key seeking (0–9)" />
+          </div>
+
+          <!-- Media Roller server config -->
+          <div class="mr-block">
+            <label class="mr-url-label" for="mr-baseurl">Media Roller server URL</label>
+            <input type="url" id="mr-baseurl" placeholder="http://127.0.0.1:8080" aria-label="Media Roller base URL" />
+            <button type="button" class="reset-btn" id="mr-save" title="Save server URL">Save</button>
+            <span class="status" id="mr-config-status" role="status" aria-live="polite"></span>
+            <p class="mr-explanation">Sends the current tab URL to your configured server for download.</p>
+          </div>
+        </div>
+      </details>
+
+      <!-- Status area: only visible for real errors / pending notices -->
+      <div class="status-area" id="status-area" hidden>
+        <span class="status" id="volume-status" role="status" aria-live="polite"></span>
+        <span class="status" id="peaks-status" role="status" aria-live="polite"></span>
+        <span class="status" id="speed-status" role="status" aria-live="polite"></span>
+        <span class="status" id="mr-status" role="status" aria-live="polite"></span>
+      </div>
+    </main>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

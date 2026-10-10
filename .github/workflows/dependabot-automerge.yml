@@ -1,0 +1,97 @@
+# Dependabot auto-merge workflow.
+#
+# SCHEDULE: Runs daily at 02:00 UTC. Live merges are OFF by default;
+# the schedule runs in dry-run mode until the repository variable
+# AUTOMERGE_LIVE is set to 'true' (parent enables after safety review).
+#
+# SAFETY:
+#   - NEVER checks out PR code or runs npm install/build.
+#   - Uses the default GITHUB_TOKEN (no PAT, no secrets).
+#   - Only merges PRs authored by dependabot[bot] from this repo.
+#   - Only merges PRs changing EXACTLY package.json + package-lock.json.
+#   - Only merges patch/minor bumps of EXISTING devDependencies.
+#   - Requires npm registry publication age >= 7 days for ALL changed
+#     versions (including nested/transitive), verified live.
+#   - Requires ci.yml workflow + all named jobs to pass on exact head SHA.
+#   - Validates registry URL + integrity hash for every changed version.
+#   - Uses merge API with sha=headSha to prevent race conditions.
+#   - Verifies merge succeeded by reading back PR state.
+#
+# ACTIVATION (parent):
+#   1. Set repository variable AUTOMERGE_LIVE = false (default).
+#   2. After safety review, set AUTOMERGE_LIVE = true to enable live merges
+#      from the scheduled run. workflow_dispatch always defaults to dry-run.
+#
+# Major updates: NOT auto-merged (manual review required).
+# All new/changed lockfile versions (including nested/transitive) must pass
+# the 7-day publication cooldown.
+
+name: Dependabot auto-merge
+
+on:
+  schedule:
+    - cron: '0 2 * * *'  # daily 02:00 UTC
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Log decisions without merging (default: true)'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+      pr_number:
+        description: 'Specific PR number to evaluate (optional)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: write
+  actions: read
+  checks: read
+
+concurrency:
+  group: dependabot-automerge
+  cancel-in-progress: false
+
+jobs:
+  auto-merge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    env:
+      GITHUB_REPOSITORY: ${{ github.repository }}
+      COOLDOWN_DAYS: '7'
+      # Schedule: live only when AUTOMERGE_LIVE repo var is 'true'.
+      # workflow_dispatch: dry-run unless input explicitly set to 'false'.
+      DRY_RUN: ${{ github.event.inputs.dry_run || (github.event_name == 'schedule' && vars.AUTOMERGE_LIVE == 'true' && 'false') || 'true' }}
+      GITHUB_TOKEN: ${{ github.token }}
+
+    steps:
+      - name: Checkout (scripts only — never PR code)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: |
+            scripts/dependabot-automerge.mjs
+          sparse-checkout-cone-mode: false
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+
+      - name: Run auto-merge gate
+        id: gate
+        env:
+          PR_NUMBER: ${{ github.event.inputs.pr_number || '' }}
+        run: |
+          cd ${{ github.workspace }}
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "[INFO] Running in DRY-RUN mode (no merges will be performed)"
+            node scripts/dependabot-automerge.mjs --dry-run
+          else
+            echo "[INFO] Running in LIVE mode (eligible PRs will be merged)"
+            node scripts/dependabot-automerge.mjs
+          fi

@@ -1,0 +1,19 @@
+# E2E workspace node_modules — local harness + browsers only
+node_modules/.cache/
+node_modules/firefox-webext-playwright-harness/
+node_modules/@playwright/
+node_modules/playwright/
+node_modules/playwright-core/
+node_modules/jszip/
+node_modules/.package-lock.json
+
+# Per-run artifacts
+.ext-copy/
+.night-ext-copy/
+.night-ext-copy-audio/
+baseline-result.json
+night-mode-trusted-result.json
+night-mode-trusted-audio-result.json
+
+# npm
+package-lock.json

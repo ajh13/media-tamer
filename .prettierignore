@@ -1,0 +1,9 @@
+node_modules/
+dist/
+build/
+*.xpi
+*.zip
+playwright-report/
+test-results/
+.eslintcache
+.prettiercache
