@@ -1,0 +1,15 @@
+{
+  "version": {
+    "license": "MIT"
+  },
+  "categories": {
+    "firefox": ["photos-music-videos"]
+  },
+  "summary": {
+    "en-US": "Control media volume, speed, night mode, seeking, and Media Roller downloads."
+  },
+  "homepage": {
+    "en-US": "https://github.com/ajh13/media-tamer"
+  },
+  "requires_payment": false
+}

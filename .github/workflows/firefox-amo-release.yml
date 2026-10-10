@@ -1,0 +1,103 @@
+name: Firefox AMO Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      amo_channel:
+        description: 'AMO channel to submit to'
+        type: choice
+        required: true
+        default: listed
+        options:
+          - listed
+          - unlisted
+      publish_to_amo:
+        description: 'Submit/sign with Mozilla Add-ons after validation'
+        type: boolean
+        required: true
+        default: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  release:
+    name: Validate, package, and submit to AMO
+    runs-on: ubuntu-latest
+    env:
+      AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
+      AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+      REQUESTED_AMO_CHANNEL: ${{ inputs.amo_channel || 'listed' }}
+      REQUESTED_AMO_PUBLISH: ${{ inputs.publish_to_amo || github.event_name == 'push' }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint JavaScript
+        run: npm run lint:js
+
+      - name: Validate extension manifest and assets
+        run: npm run lint:ext
+
+      - name: Check formatting
+        run: npm run format:check
+
+      - name: Run unit tests
+        run: npm test -- --passWithNoTests
+
+      - name: Run browser tests
+        run: npm run test:browser
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Build unsigned extension package
+        run: npm run build
+
+      - name: Upload unsigned package artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: media-tamer-unsigned
+          path: dist/*.zip
+          if-no-files-found: error
+
+      - name: Check AMO secrets
+        if: env.REQUESTED_AMO_PUBLISH == 'true'
+        run: |
+          if [[ -z "$AMO_JWT_ISSUER" || -z "$AMO_JWT_SECRET" ]]; then
+            echo 'AMO_JWT_ISSUER and AMO_JWT_SECRET GitHub Actions secrets are required to publish to AMO.' >&2
+            exit 1
+          fi
+
+      - name: Submit listed release to AMO
+        if: env.REQUESTED_AMO_PUBLISH == 'true' && env.REQUESTED_AMO_CHANNEL == 'listed'
+        run: npm run sign:amo:listed
+
+      - name: Submit unlisted release to AMO
+        if: env.REQUESTED_AMO_PUBLISH == 'true' && env.REQUESTED_AMO_CHANNEL == 'unlisted'
+        run: npm run sign:amo:unlisted
+
+      - name: Upload signed package artifact
+        if: env.REQUESTED_AMO_PUBLISH == 'true'
+        uses: actions/upload-artifact@v5
+        with:
+          name: media-tamer-signed
+          path: dist/amo/*
+          if-no-files-found: warn

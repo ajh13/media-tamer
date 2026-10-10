@@ -1,7 +1,7 @@
 {
   "name": "media-tamer",
   "version": "1.0.0",
-  "description": "Media Tamer — Firefox browser extension for video playback control (volume boost, speed, night mode, seek undo, media-roller download).",
+  "description": "Media Tamer \u2014 Firefox browser extension for video playback control (volume boost, speed, night mode, seek undo, media-roller download).",
   "private": false,
   "type": "module",
   "scripts": {
@@ -15,7 +15,9 @@
     "format": "prettier --write extensions/media-tamer/*.js test/unit/*.js test/browser/*.js scripts/*.mjs eslint.config.mjs .prettierrc.json",
     "audit": "npm audit --omit=dev",
     "audit:full": "npm audit",
-    "build": "node scripts/build.cjs"
+    "build": "node scripts/build.cjs",
+    "sign:amo:listed": "npx --yes web-ext@latest sign --source-dir extensions/media-tamer --artifacts-dir dist/amo --channel=listed --amo-metadata amo-metadata.json --api-key=\"$AMO_JWT_ISSUER\" --api-secret=\"$AMO_JWT_SECRET\" --approval-timeout=900000 --no-input",
+    "sign:amo:unlisted": "npx --yes web-ext@latest sign --source-dir extensions/media-tamer --artifacts-dir dist/amo --channel=unlisted --api-key=\"$AMO_JWT_ISSUER\" --api-secret=\"$AMO_JWT_SECRET\" --approval-timeout=900000 --no-input"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",

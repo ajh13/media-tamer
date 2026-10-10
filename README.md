@@ -12,7 +12,7 @@ A combined Firefox extension (page-action popup + tab-context presets) that bloc
 
 Optional **Media Roller** lets you send the current tab URL to a self-hosted server and start a native Firefox download (opt-in only; see below).
 
-> **Status:** experimental prototype. An unsigned ZIP can be built locally; no signed XPI is available yet. Core controls, popup layout, Media Roller loopback download, and Firefox E2E paths are covered by automated tests. Not validated against every streaming service.
+> **Status:** experimental prototype. An unsigned ZIP can be built locally, and the repository includes a tag-triggered GitHub Actions workflow for Mozilla Add-ons signing/submission once AMO API secrets are configured. Core controls, popup layout, Media Roller loopback download, and Firefox E2E paths are covered by automated tests. Not validated against every streaming service.
 
 ## Installing
 
@@ -31,7 +31,7 @@ No pre-built release artifact is published. Build the extension, then load it te
 
 4. Reload your video page. Open **Media Tamer** in the address bar (Firefox may group page actions under its menu). Right-click a tab for presets.
 
-Temporary installation is removed when Firefox restarts. Permanent installation requires Mozilla signing; no signed artifact exists. See [docs/signing.md](docs/signing.md) for the prepared self-distribution path. **Do not disable signature verification.**
+Temporary installation is removed when Firefox restarts. Permanent installation requires Mozilla signing. This repo can submit to AMO from GitHub Actions after `AMO_JWT_ISSUER` and `AMO_JWT_SECRET` are configured as repository secrets. See [docs/signing.md](docs/signing.md). **Do not disable signature verification.**
 
 ## Requirements
 
