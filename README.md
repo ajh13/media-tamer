@@ -1,90 +1,64 @@
 # Media Tamer — Firefox Extension
 
-A combined Firefox extension (page-action popup + tab-context presets) that blocks accidental number-key seeks and adds playback controls:
+Block accidental number-key seeks and control playback from an address-bar popup or tab menu.
 
-| Feature | Range | Reset |
-|---------|-------|-------|
-| **Number-key seek block** | 0–9 unmodified keys intercepted; normal text entry preserved | ON/OFF toggle in Settings |
-| **Volume boost** | 0–300% relative to the player's starting volume | 100% |
-| **Playback speed** | 0.25–3× | 1× |
-| **Night mode** | Dynamic-range compression (not dialogue isolation) | Off |
-| **Seek undo** | Configurable shortcut (default `Ctrl+Z`) | — |
+| Control | Range / behavior |
+| --- | --- |
+| Number-key seek block | Intercepts unmodified 0–9 outside text fields; toggle in Settings |
+| Volume | 0–300% of the player's starting volume; reset to 100% |
+| Speed | 0.25–3×; reset to 1× |
+| Night mode | Dynamic-range compression; off by default |
+| Seek undo | Configurable shortcut (default `Ctrl+Z`) |
 
-Optional **Media Roller** lets you send the current tab URL to a self-hosted server and start a native Firefox download (opt-in only; see below).
+Optional [Media Roller](https://github.com/rroller/media-roller) integration sends the current tab URL to your self-hosted server for download.
 
-> **Status:** experimental prototype. An unsigned ZIP can be built locally, and the repository includes a tag-triggered GitHub Actions workflow for Mozilla Add-ons signing/submission once AMO API secrets are configured. Core controls, popup layout, Media Roller loopback download, and Firefox E2E paths are covered by automated tests. Not validated against every streaming service.
+> **Experimental:** No pre-built release is published. Automated tests cover the controls and local download path, but not every streaming service.
 
-## Installing
+## Install
 
-No pre-built release artifact is published. Build the extension, then load it temporarily in Firefox:
+Requires Firefox 142+, Node.js 24, and npm 12+.
 
-1. Install dependencies and build:
-   ```bash
-   npm ci
-   npm run build
-   ```
-   This produces an unsigned ZIP under `dist/` (e.g. `dist/media_tamer-<version>.zip`).
+```bash
+npm ci
+npm run build
+```
 
-2. In Firefox 142+, open `about:debugging#/runtime/this-firefox`.
+The build creates an unsigned ZIP at `dist/media_tamer-<version>.zip`. To try it, open `about:debugging#/runtime/this-firefox` in Firefox and load `extensions/media-tamer/manifest.json` as a **Temporary Add-on**. Reload your video page, then open Media Tamer in the address bar or right-click the tab for presets.
 
-3. Choose **Load Temporary Add-on…** and select the `manifest.json` inside `extensions/media-tamer/`.
+Temporary add-ons disappear when Firefox restarts. Permanent installation requires Mozilla signing; see [signing instructions](docs/signing.md). **Do not disable signature verification.**
 
-4. Reload your video page. Open **Media Tamer** in the address bar (Firefox may group page actions under its menu). Right-click a tab for presets.
+## Limits
 
-Temporary installation is removed when Firefox restarts. Permanent installation requires Mozilla signing. This repo can submit to AMO from GitHub Actions after `AMO_JWT_ISSUER` and `AMO_JWT_SECRET` are configured as repository secrets. See [docs/signing.md](docs/signing.md). **Do not disable signature verification.**
-
-## Requirements
-
-- Firefox **142+** (uses `data_collection_permissions` and `browser.theme`)
-- Node.js **24**, npm 12+ (to build / run tests)
-
-## What works — and what doesn't
-
-**Honest limits:**
-
-- **DRM / unsafe cross-origin media** cannot use Web Audio boost or night mode. Native volume reduction may still apply.
-- **Web Audio routing is irreversible** for a media element. If a site swaps sources after routing, or playback goes silent, reload the page. Conservative checks are used, but redirect safety cannot be guaranteed.
-- **Night mode is compression**, not AI dialogue enhancement and not a guaranteed brickwall limiter. Start at a low listening volume.
-- **Seek history** cannot always distinguish your seeks from site-initiated ones. Closed shadow roots and some custom players may not be intercepted.
-- **Per-tab volume/speed/night settings** reset on full navigation. Shortcut and Media Roller configuration are stored locally.
-- No claim of compatibility with YouTube, Netflix, HBO/Max, Jellyfin, or other DRM-walled services is made.
+- DRM and unsafe cross-origin media may prevent Web Audio boost or compression; native volume reduction may still work. No compatibility with specific streaming services is promised.
+- Web Audio routing cannot be undone for an element. If audio goes silent or a site swaps sources, reload the page. Redirects can also defeat safety checks.
+- Night mode compresses dynamics; it does not isolate dialogue or guarantee a brickwall limit. Start at a low volume.
+- Seek undo may include site-initiated seeks. Closed shadow roots and custom players may evade number-key blocking.
+- Volume, speed, and night mode reset on full navigation; shortcuts and Media Roller configuration persist locally.
 
 ## Media Roller
 
-An optional, user-controlled remote-download helper. Disabled until you explicitly configure a server.
+[Media Roller](https://github.com/rroller/media-roller) is a separate, unauthenticated, self-hosted download server intended for a trusted home network. **Do not expose it to public traffic.** Its `/api/download?url=…` endpoint is the integration used here.
 
-- Expand the popup's **Media Roller** settings and save your self-hosted server's base URL (`http://` or `https://`, no credentials, no query string, no fragment).
-- Saving a URL does **not** initiate a download. Clicking **Download** requests the optional `downloads` permission, then sends the current tab URL to the fixed `/api/download?url=…` endpoint on your server and uses Firefox's download behavior.
-- **No cookies, passwords, or authentication tokens** are exported. URLs may contain sensitive query parameters — use only a server you trust.
-- The server and your Firefox download history may retain those URLs. Cancelling a browser download may not stop server-side work. DRM downloading is not promised.
-- Media Roller's native Firefox download path is verified against a local loopback server. Real self-hosted/server deployments still need user-specific validation.
+In the popup, expand **Media Roller** and save its base URL (`http://` or `https://`, without credentials, query, or fragment). Saving does not download anything. Clicking **Download** requests Firefox's optional `downloads` permission, sends the current tab URL to that server, and starts a native Firefox download.
+
+No browser cookies or saved passwords are sent separately, but the URL itself can contain sensitive parameters or tokens. Use only a server you trust. The server and Firefox history may retain it; cancelling the browser download may not stop server-side work. DRM downloading is not promised. The download path was tested with a local loopback server, not every self-hosted deployment.
 
 ## Privacy & permissions
 
-- **No telemetry.** No analytics, no beacon, no remote reporting.
-- Playback settings stay in memory per tab. Shortcut and Media Roller configuration persist in `storage.local` (not synced). Optional downloads transmit the current tab URL to your chosen server.
-- Manifest `permissions`: `menus`, `storage`, `webNavigation`, `activeTab`, `theme`. `downloads` is optional and only requested on an explicit user gesture.
-- `data_collection_permissions` declares `required: none`, `optional: browsingActivity` (the latter only used by the opt-in Media Roller download flow).
+No telemetry. Per-tab playback settings stay in memory; shortcuts and Media Roller settings use `storage.local` (not sync). The manifest uses `menus`, `storage`, `webNavigation`, `activeTab`, and `theme`; `downloads` is requested only when you click Download. `data_collection_permissions` declares no required collection and optional `browsingActivity` for that opt-in flow.
 
-## Verification & tests
+## Test
 
 ```bash
-npm ci              # install from lockfile (never `npm install`)
-npm test            # unit tests: Node 24, mocked Firefox/Web Audio APIs
-npm run lint        # ESLint (flat config) + extension structural validator
+npm test                 # unit tests
+npm run lint             # ESLint and extension validation
 npm run format:check
-npm run build       # unsigned .zip in dist/
-npm run test:browser    # real Firefox via Playwright (requires Firefox binary)
+npm run build            # unsigned ZIP
+npm run test:browser     # Playwright + Firefox binary
 ```
 
-Browser tests verify keyboard interception, typing, iframes, theme-aware popup/menu behavior, Media Roller's native Firefox download path against a loopback server, and real `OfflineAudioContext` compression. Unit tests exercise production classic scripts against mocked APIs.
-
-A separate, **isolated e2e** harness (`test/e2e/`) exercises the anchored-popup path with a pinned Firefox profile. It runs independently (own lockfile, own browsers) and verifies popup → background → content-script behavior on a deterministic media fixture, including the private-PulseAudio night-mode activation path when the private null sink is available. Unit tests are not a substitute for end-to-end validation on real sites.
-
-## Repository maintenance
-
-ESLint, Prettier, structural validation, tests, npm audit, and Dependabot configuration are included. SHA-pinned GitHub Actions CI runs quality → unit tests → browser tests. The Dependabot auto-merge gate runs in dry-run by default and is verified in CI; live scheduled merges require `AUTOMERGE_LIVE=true`. Major updates and GitHub Actions changes require manual review.
+Browser tests cover keyboard interception, popup behavior, local Media Roller downloads, and real audio compression. A separate harness in `test/e2e/` tests the anchored popup with a pinned Firefox profile; neither suite proves compatibility with every site.
 
 ## License
 
-Licensed under the [MIT License](LICENSE). See [SECURITY.md](SECURITY.md) for reporting guidance.
+[MIT](LICENSE). Report security issues via [SECURITY.md](SECURITY.md).
