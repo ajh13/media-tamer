@@ -1,0 +1,110 @@
+name: GitHub Release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - extensions/media-tamer/manifest.json
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: github-release-main
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Validate and publish unsigned ZIP
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository and tags
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Check manifest version and release tag
+        id: version
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+          EVENT_NAME: ${{ github.event_name }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version="$(node -p "require('./extensions/media-tamer/manifest.json').version")"
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
+            echo "Invalid extension version: $version" >&2
+            exit 1
+          fi
+          tag="v$version"
+          if [[ "$EVENT_NAME" == push && "$BEFORE_SHA" != 0000000000000000000000000000000000000000 ]]; then
+            previous="$(git show "$BEFORE_SHA:extensions/media-tamer/manifest.json" | node -pe "JSON.parse(require('fs').readFileSync(0, 'utf8')).version" 2>/dev/null || true)"
+            if [[ "$version" == "$previous" ]]; then
+              echo "Manifest version unchanged ($version); no release."
+              exit 0
+            fi
+          fi
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release $tag already exists; no duplicate."
+            exit 0
+          fi
+          if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+            tagged_sha="$(git rev-list -n 1 "$tag")"
+            if [[ "$tagged_sha" != "$GITHUB_SHA" ]]; then
+              echo "Tag $tag already points to $tagged_sha, not $GITHUB_SHA; refusing to retag." >&2
+              exit 1
+            fi
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Node.js
+        if: steps.version.outputs.tag != ''
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install dependencies
+        if: steps.version.outputs.tag != ''
+        run: npm ci
+
+      - name: Lint and validate extension
+        if: steps.version.outputs.tag != ''
+        run: npm run lint && npm run format:check
+
+      - name: Run unit tests
+        if: steps.version.outputs.tag != ''
+        run: npm test
+
+      - name: Install Firefox for Playwright
+        if: steps.version.outputs.tag != ''
+        run: npx playwright install --with-deps firefox
+
+      - name: Run browser tests
+        if: steps.version.outputs.tag != ''
+        run: npm run test:browser
+
+      - name: Audit production dependencies
+        if: steps.version.outputs.tag != ''
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Build unsigned extension
+        if: steps.version.outputs.tag != ''
+        run: npm run build
+
+      - name: Publish GitHub release
+        if: steps.version.outputs.tag != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          gh release create "$TAG" "dist/media_tamer-$VERSION.zip" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "$TAG" \
+            --generate-notes

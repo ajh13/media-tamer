@@ -17,6 +17,12 @@ dist/media_tamer-<version>.zip
 
 This ZIP is unsigned. It is useful for inspection and manual upload, but it is not a permanent-install Firefox release until Mozilla signs it.
 
+## Automatic GitHub Releases
+
+On a push to `main` that changes `extensions/media-tamer/manifest.json` **and changes its `version`**, `.github/workflows/github-release.yml` validates the extension, runs tests, builds an unsigned ZIP, and creates a GitHub Release named `v<manifest-version>` with the ZIP attached. Other commits and manifest edits without a version bump do not create releases. Existing releases are skipped; a matching tag at a different commit causes an error rather than being moved. The workflow can also be run manually from the Actions tab to publish the current version (for example, to bootstrap an existing version).
+
+The `package.json` version is not the extension version; update the manifest's `version` for each release. GitHub Releases are **not** AMO submissions and their unsigned ZIPs cannot be installed permanently in Firefox. A tag created with the workflow's `GITHUB_TOKEN` does not trigger the separate tag-push AMO workflow; submit to AMO separately when intended.
+
 ## GitHub Actions AMO workflow
 
 Workflow file:
