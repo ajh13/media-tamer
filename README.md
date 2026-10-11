@@ -12,7 +12,7 @@ Block accidental number-key seeks and control playback from an address-bar popup
 
 Optional [Media Roller](https://github.com/rroller/media-roller) integration sends the current tab URL to your self-hosted server for download.
 
-> **Experimental:** No pre-built release is published. Automated tests cover the controls and local download path, but not every streaming service.
+> **Experimental:** [GitHub Releases](https://github.com/ajh13/media-tamer/releases) include unsigned ZIPs, not permanently installable Firefox add-ons. Automated tests cover the controls and local download path, but not every streaming service.
 
 ## Install
 
@@ -23,7 +23,7 @@ npm ci
 npm run build
 ```
 
-The build creates an unsigned ZIP at `dist/media_tamer-<version>.zip`. To try it, open `about:debugging#/runtime/this-firefox` in Firefox and load `extensions/media-tamer/manifest.json` as a **Temporary Add-on**. Reload your video page, then open Media Tamer in the address bar or right-click the tab for presets.
+The build creates an unsigned ZIP at `dist/media_tamer-<version>.zip` (also attached to [GitHub Releases](https://github.com/ajh13/media-tamer/releases)). To try it, open `about:debugging#/runtime/this-firefox` in Firefox and load `extensions/media-tamer/manifest.json` as a **Temporary Add-on**. Reload your video page, then open Media Tamer in the address bar or right-click the tab for presets.
 
 Temporary add-ons disappear when Firefox restarts. Permanent installation requires Mozilla signing; see [signing instructions](docs/signing.md). **Do not disable signature verification.**
 
