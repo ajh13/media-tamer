@@ -1,7 +1,7 @@
 /**
  * Media Tamer — Popup script (IIFE, classic script, no ES modules).
  *
- * Firefox MV2 page_action popup. Compact drag-surface sliders.
+ * Shared Firefox and Chrome popup. Compact drag-surface sliders.
  * Sends commands to background, awaits real responses, renders honest state.
  *
  * Tab target captured at popup open, held constant. Controls disabled until
@@ -537,7 +537,7 @@
     try {
       const granted = await browser.permissions.request({
         permissions: ['downloads'],
-        data_collection: ['browsingActivity'],
+        ...(browser.action ? {} : { data_collection: ['browsingActivity'] }),
       });
       if (!granted) {
         if (el.mrStatus) el.mrStatus.textContent = 'Permission denied';

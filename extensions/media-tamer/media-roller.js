@@ -304,7 +304,7 @@ var VC_MEDIA_ROLLER = (function () {
     try {
       hasPermission = await browser.permissions.contains({
         permissions: [REQUIRED_PERMISSION],
-        data_collection: ['browsingActivity'],
+        ...(browser.action ? {} : { data_collection: ['browsingActivity'] }),
       });
     } catch (e) {
       return {

@@ -264,9 +264,4 @@ describe('manifest validation', () => {
     const manifest = JSON.parse(fs.readFileSync(path.join(EXT_DIR, 'manifest.json'), 'utf8'));
     assert.ok(!manifest.page_action.theme_icons, 'theme_icons must be absent from page_action');
   });
-
-  test('version is 1.2.2', () => {
-    const manifest = JSON.parse(fs.readFileSync(path.join(EXT_DIR, 'manifest.json'), 'utf8'));
-    assert.equal(manifest.version, '1.2.2');
-  });
 });

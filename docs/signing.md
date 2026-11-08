@@ -1,116 +1,33 @@
-# Firefox Signing and AMO Release
+# Marketplace releases
 
-Firefox requires Mozilla signing for permanent installation of release builds. Media Tamer now has a GitHub Actions workflow that can validate, package, and submit the extension to Mozilla Add-ons (AMO).
+A version bump in `extensions/media-tamer/manifest.json` merged to `main` runs **Release Media Tamer**. It validates and tests both browsers, packages both extensions, and runs the Mozilla Add-ons, Chrome Web Store, and GitHub Release jobs independently. Both stores control their own review and publication timing.
 
-## Local unsigned build
+`npm run build` produces `dist/media_tamer-<version>.zip` for Firefox and `dist/media_tamer-chrome-<version>.zip` for Chrome. The build derives Chrome's Manifest V3 and worker entry point from the Firefox manifest. Feature code, popup assets, and the version are shared. Bump the manifest version for each release.
 
-```bash
-npm ci
-npm run build
-```
+## Mozilla Add-ons setup
 
-Output:
+Set the `AMO_JWT_ISSUER` and `AMO_JWT_SECRET` repository Actions secrets using credentials from [Mozilla Add-ons Developer Hub](https://addons.mozilla.org/developers/addon/api/key/). The credential must have access to the listing for the Gecko ID in the manifest. The workflow uses `amo-metadata.json` for listed submissions and exits after submitting for review.
 
-```text
-dist/media_tamer-<version>.zip
-```
+For a local signed build, export both AMO credentials in a trusted shell and run `npm run sign:amo:listed` or `npm run sign:amo:unlisted`. A returned XPI is written to `dist/amo/`. For self-distribution from GitHub Actions, run the release workflow with target `firefox-unlisted`.
 
-This ZIP is unsigned. It is useful for inspection and manual upload, but it is not a permanent-install Firefox release until Mozilla signs it.
+## Chrome Web Store setup
 
-## Automatic GitHub Releases
+1. Register as a [Chrome Web Store developer](https://developer.chrome.com/docs/webstore/register) and enable 2-step verification. In the Developer Dashboard, create the Media Tamer item if needed and complete the Store Listing, Privacy, and Distribution sections. Set the intended public visibility. For a new draft, upload a bootstrap ZIP with a version lower than the first automated release, so the version bump can replace that package. Use the project's build with the lower version in a disposable checkout.
+2. Enable the Chrome Web Store API in Google Cloud. Create OAuth credentials and obtain a refresh token with the `https://www.googleapis.com/auth/chromewebstore` scope from an account that can publish the item. Put the OAuth consent app in production so the refresh token can be used for ongoing releases. Follow [Google's Chrome Web Store API setup](https://developer.chrome.com/docs/webstore/using-api).
+3. In GitHub **Settings → Secrets and variables → Actions**, configure these values.
 
-On a push to `main` that changes `extensions/media-tamer/manifest.json` **and changes its `version`**, `.github/workflows/github-release.yml` validates the extension, runs tests, builds an unsigned ZIP, and creates a GitHub Release named `v<manifest-version>` with the ZIP attached. Other commits and manifest edits without a version bump do not create releases. Existing releases are skipped; a matching tag at a different commit causes an error rather than being moved. The workflow can also be run manually from the Actions tab to publish the current version (for example, to bootstrap an existing version).
+| Kind | Name | Value |
+| --- | --- | --- |
+| Variable | `CWS_PUBLISHER_ID` | Publisher ID from Developer Dashboard publisher settings |
+| Variable | `CWS_EXTENSION_ID` | 32-character Chrome item ID |
+| Secret | `CWS_CLIENT_ID` | Google OAuth client ID |
+| Secret | `CWS_CLIENT_SECRET` | Google OAuth client secret |
+| Secret | `CWS_REFRESH_TOKEN` | Refresh token for the store publishing account |
 
-The `package.json` version is not the extension version; update the manifest's `version` for each release. GitHub Releases are **not** AMO submissions and their unsigned ZIPs cannot be installed permanently in Firefox. A tag created with the workflow's `GITHUB_TOKEN` does not trigger the separate tag-push AMO workflow; submit to AMO separately when intended.
+The Chrome job uploads the versioned ZIP through API v2 and requests publication after approval. The API uses the listing's visibility. If Google requires the first submission or a visibility change to be published from the dashboard, complete that step there. The workflow recognizes a matching version already published or pending review.
 
-## GitHub Actions AMO workflow
+For the store privacy form, describe Media Roller's optional transfer of the current URL to the user's self-hosted server and link to the [README privacy section](../README.md#privacy--permissions). Chrome uses site access for media control, `activeTab` for user-initiated URL access, `webNavigation` to reach embedded frames, `contextMenus` for presets, `declarativeContent` to enable the toolbar button on web pages, and optional `downloads` for Media Roller.
 
-Workflow file:
+## Retry a submission
 
-```text
-.github/workflows/firefox-amo-release.yml
-```
-
-It runs on:
-
-- pushed version tags matching `v*.*.*`, for automatic releases
-- manual `workflow_dispatch`, with a selectable `listed` or `unlisted` AMO channel
-
-The workflow performs:
-
-1. `npm ci`
-2. `npm run lint:js`
-3. `npm run lint:ext`
-4. `npm run format:check`
-5. `npm test -- --passWithNoTests`
-6. `npm run test:browser`
-7. `npm audit --omit=dev --audit-level=high`
-8. `npm run build`
-9. `web-ext sign` submission to AMO when publishing is enabled
-
-## Required GitHub repository secrets
-
-Create these in GitHub under **Settings → Secrets and variables → Actions → New repository secret**:
-
-| Secret | Value |
-| --- | --- |
-| `AMO_JWT_ISSUER` | AMO API JWT issuer / API key |
-| `AMO_JWT_SECRET` | AMO API JWT secret |
-
-Get both from the AMO credentials page:
-
-```text
-https://addons.mozilla.org/developers/addon/api/key/
-```
-
-Do not commit these values, paste them into issues, or print them in logs.
-
-## First listed submission
-
-For a listed AMO release, `web-ext sign --channel=listed` needs metadata. This repository includes:
-
-```text
-amo-metadata.json
-```
-
-The first AMO-listed submission can still require Mozilla account setup, validation prompts, or review before it becomes available to users. Future tagged releases use the same extension ID from `extensions/media-tamer/manifest.json`.
-
-## Triggering an automatic AMO release
-
-After the secrets are configured and the manifest version is bumped:
-
-```bash
-git tag v<manifest-version>
-git push origin v<manifest-version>
-```
-
-Example:
-
-```bash
-git tag v1.2.2
-git push origin v1.2.2
-```
-
-That tag starts the workflow and submits to the default `listed` AMO channel. For a one-off test, run **Firefox AMO Release** manually from GitHub Actions and choose `unlisted`.
-
-## Local AMO signing commands
-
-These commands require `AMO_JWT_ISSUER` and `AMO_JWT_SECRET` in the shell environment:
-
-```bash
-npm run sign:amo:listed
-npm run sign:amo:unlisted
-```
-
-The signed artifact, when AMO returns one, is written under:
-
-```text
-dist/amo/
-```
-
-## Safety notes
-
-- Do not disable Firefox signature verification to work around signing.
-- Do not reuse AMO credentials outside GitHub Actions or a local trusted shell.
-- Listed releases may wait for Mozilla review; the workflow can submit the version, but AMO controls final publication timing.
-- If AMO rejects the upload, fix the manifest/code, bump the manifest version, and tag again.
+Re-run failed jobs after fixing their setup. To submit the current main version independently, open **Actions → Release Media Tamer → Run workflow** and select `chrome`, `firefox`, or `github`. Use the respective dashboard to check review status and resolve any rejected submission.
