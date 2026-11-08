@@ -1,17 +1,18 @@
 /**
  * Media Tamer — Background script (IIFE, classic script, no ES modules).
  *
- * Firefox MV2 page_action extension. Routes popup commands to content scripts,
- * awaits real responses, reports actual applied state. Per-tab in-memory state
- * only (volume=100, speed=1, night=0). Resets on navigation/tab close.
+ * Routes popup commands to content scripts and reports actual applied state.
+ * Playback settings reset on navigation or tab close.
  *
  * Frame support: uses browser.webNavigation.getAllFrames (preferred) or
  * tabs.sendMessage broadcast fallback. Aggregates per-frame responses.
- *
- * Permissions required: menus, storage, webNavigation, pageAction, tabs, activeTab.
+
  */
 (function () {
   'use strict';
+
+  const isChrome = Boolean(browser.action);
+  const menus = browser.menus ?? browser.contextMenus;
 
   // --- Protocol constants ---
   const VC = {
@@ -48,8 +49,21 @@
     NIGHT: { min: 0, max: 100 },
   };
 
-  // --- Per-tab in-memory state ---
+  // Chrome's worker can stop while tabs remain open. Hydrate before handling
+  // events and use one session-storage key per tab to isolate concurrent tabs.
   const tabState = new Map();
+  const tabStatePrefix = 'playback:';
+  const session = isChrome ? browser.storage.session : null;
+  const stateReady = session
+    ?.get(null)
+    .then((data) => {
+      for (const [key, state] of Object.entries(data)) {
+        if (key.startsWith(tabStatePrefix)) {
+          tabState.set(Number(key.slice(tabStatePrefix.length)), state);
+        }
+      }
+    })
+    .catch(console.error);
 
   function getState(tabId) {
     if (!tabState.has(tabId)) {
@@ -60,16 +74,22 @@
 
   function cleanupTab(tabId) {
     tabState.delete(tabId);
+    session?.remove(tabStatePrefix + tabId).catch(console.error);
+  }
+
+  function updateState(tabId, changes) {
+    const state = Object.assign(getState(tabId), changes);
+    return session?.set({ [tabStatePrefix + tabId]: state }).catch(console.error);
   }
 
   // --- Sender validation ---
-  // Popup: must have matching id, exact URL, and NOT have sender.tab
+  // Only the extension's own popup document may issue playback commands.
   function isPopup(sender) {
     return (
       sender &&
       sender.id === browser.runtime.id &&
       sender.url === browser.runtime.getURL('popup.html') &&
-      !sender.tab
+      (!sender.tab || isChrome)
     );
   }
 
@@ -244,7 +264,8 @@
   // --- Page action ---
   function updateActionTitle(tabId, percent) {
     try {
-      browser.pageAction.setTitle({ tabId, title: `Media Tamer \u2014 ${percent}%` });
+      const action = browser.pageAction ?? browser.action;
+      action.setTitle({ tabId, title: `Media Tamer \u2014 ${percent}%` }).catch(() => {});
     } catch (_) {}
   }
 
@@ -412,12 +433,13 @@
     if (tabId == null) return { error: 'no tab' };
     if (!validVolume(msg.percent)) return { error: 'invalid percent', requested: msg.percent };
 
-    getState(tabId).volume = msg.percent;
+    const saved = updateState(tabId, { volume: msg.percent });
     const results = await broadcast(tabId, {
       type: VC.VOLUME_SET,
       percent: msg.percent,
       tabId,
     });
+    await saved;
     const agg = aggVolume(results, msg.percent);
     updateActionTitle(tabId, msg.percent);
     return agg;
@@ -436,12 +458,13 @@
     if (tabId == null) return { error: 'no tab' };
     if (!validSpeed(msg.speed)) return { error: 'invalid speed', requested: msg.speed };
 
-    getState(tabId).speed = msg.speed;
+    const saved = updateState(tabId, { speed: msg.speed });
     const results = await broadcast(tabId, {
       type: VC.SPEED_SET,
       speed: msg.speed,
       tabId,
     });
+    await saved;
     return aggSpeed(results, msg.speed);
   }
 
@@ -459,12 +482,13 @@
     if (!validNight(msg.strength))
       return { error: 'invalid night strength', requested: msg.strength };
 
-    getState(tabId).night = msg.strength;
+    const saved = updateState(tabId, { night: msg.strength });
     const results = await broadcast(tabId, {
       type: VC.NIGHT_SET,
       strength: msg.strength,
       tabId,
     });
+    await saved;
     return aggNight(results, msg.strength);
   }
 
@@ -545,10 +569,7 @@
     const tabId = msg.tabId;
     if (tabId == null) return { error: 'no tab' };
 
-    const state = getState(tabId);
-    state.volume = DEF.VOLUME;
-    state.speed = DEF.SPEED;
-    state.night = DEF.NIGHT;
+    const saved = updateState(tabId, { volume: DEF.VOLUME, speed: DEF.SPEED, night: DEF.NIGHT });
 
     // Broadcast all three resets to content scripts
     const volResults = await broadcast(tabId, {
@@ -567,6 +588,7 @@
       tabId,
     });
 
+    await saved;
     updateActionTitle(tabId, DEF.VOLUME);
 
     return {
@@ -580,19 +602,24 @@
   browser.runtime.onMessage.addListener((msg, sender) => {
     if (!msg || typeof msg !== 'object') return;
 
-    // Content STATUS messages — update pageAction title, no response routed back
-    if (isContent(sender)) {
-      if (msg.type === VC.VOLUME_STATUS) {
-        const state = getState(sender.tab.id);
-        const pct = msg.percent != null ? msg.percent : state.volume;
-        updateActionTitle(sender.tab.id, pct);
-      }
-      return;
+    if (isPopup(sender)) {
+      return stateReady ? stateReady.then(() => handlePopupMessage(msg)) : handlePopupMessage(msg);
     }
 
-    // Only accept commands from popup origin
-    if (!isPopup(sender)) return;
+    // Content STATUS messages update the action title without sending a response.
+    if (isContent(sender)) {
+      if (msg.type === VC.VOLUME_STATUS) {
+        const updateTitle = () => {
+          const pct = msg.percent ?? getState(sender.tab.id).volume;
+          updateActionTitle(sender.tab.id, pct);
+        };
+        if (stateReady) stateReady.then(updateTitle);
+        else updateTitle();
+      }
+    }
+  });
 
+  function handlePopupMessage(msg) {
     switch (msg.type) {
       case VC.VOLUME_SET:
         return handleVolumeSet(msg);
@@ -632,21 +659,27 @@
       default:
         return;
     }
-  });
+  }
 
   // --- Tab lifecycle ---
-  browser.tabs.onRemoved.addListener((tabId) => cleanupTab(tabId));
+  browser.tabs.onRemoved.addListener(async (tabId) => {
+    if (stateReady) await stateReady;
+    cleanupTab(tabId);
+  });
 
-  browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  browser.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
     if (changeInfo.status === 'loading') {
+      if (stateReady) await stateReady;
       cleanupTab(tabId);
       // Do NOT imperative-hide here: show_matches in the manifest handles
       // show/hide based on URL. Hiding on loading races with show_matches
       // and causes the action to vanish on newly opened video tabs.
     }
     if (changeInfo.status === 'complete' && tab) {
-      showPageAction(tabId, tab.url);
-      applyThemeIcon(tabId).catch(() => {});
+      if (!isChrome) {
+        showPageAction(tabId, tab.url);
+        applyThemeIcon(tabId).catch(() => {});
+      }
       loadSeekBinding()
         .then((binding) =>
           broadcast(tabId, { type: VC.SEEK_CONFIG, binding, enabled: true }).catch(() => {}),
@@ -663,93 +696,84 @@
   const NIGHT_PRESETS = [0, 35, 70];
 
   function createMenus() {
+    const context = isChrome
+      ? { contexts: ['page'], documentUrlPatterns: ['http://*/*', 'https://*/*'] }
+      : { contexts: ['tab'] };
+    // Chrome has no onShown event. Use commands without a checked state.
+    const checkedPreset = (type, checked) => (isChrome ? {} : { type, checked });
+    const create = (item) => menus.create({ ...context, ...item });
     try {
       // Single parent submenu
-      browser.menus.create({ id: 'vg-root', title: 'Media Tamer', contexts: ['tab'] });
+      create({ id: 'vg-root', title: 'Media Tamer' });
 
       // Volume submenu with current value in parent title
-      browser.menus.create({
+      create({
         id: 'vg-volume',
         parentId: 'vg-root',
-        title: `Volume — ${DEF.VOLUME}%`,
-        contexts: ['tab'],
+        title: isChrome ? 'Volume' : `Volume — ${DEF.VOLUME}%`,
       });
       for (const p of VOLUME_PRESETS) {
-        browser.menus.create({
+        create({
           id: `vg-volume-${p}`,
           parentId: 'vg-volume',
           title: `${p}%`,
-          contexts: ['tab'],
-          type: 'checkbox',
-          checked: p === DEF.VOLUME,
+          ...checkedPreset('checkbox', p === DEF.VOLUME),
         });
       }
 
       // Speed submenu with current value in parent title
-      browser.menus.create({
+      create({
         id: 'vg-speed',
         parentId: 'vg-root',
-        title: `Speed — ${DEF.SPEED}x`,
-        contexts: ['tab'],
+        title: isChrome ? 'Speed' : `Speed — ${DEF.SPEED}x`,
       });
       for (const s of SPEED_PRESETS) {
-        browser.menus.create({
+        create({
           id: `vg-speed-${s}`,
           parentId: 'vg-speed',
           title: `${s}x`,
-          contexts: ['tab'],
-          type: 'checkbox',
-          checked: Math.abs(s - DEF.SPEED) < 0.001,
+          ...checkedPreset('checkbox', Math.abs(s - DEF.SPEED) < 0.001),
         });
       }
 
       // Night mode submenu — radio group for presets, custom shown in parent title
-      browser.menus.create({
+      create({
         id: 'vg-night',
         parentId: 'vg-root',
-        title: 'Night mode — Off',
-        contexts: ['tab'],
+        title: isChrome ? 'Night mode' : 'Night mode — Off',
       });
-      browser.menus.create({
+      create({
         id: 'vg-night-0',
         parentId: 'vg-night',
         title: 'Off',
-        contexts: ['tab'],
-        type: 'radio',
-        checked: true,
+        ...checkedPreset('radio', true),
       });
-      browser.menus.create({
+      create({
         id: 'vg-night-35',
         parentId: 'vg-night',
         title: 'Light',
-        contexts: ['tab'],
-        type: 'radio',
-        checked: false,
+        ...checkedPreset('radio', false),
       });
-      browser.menus.create({
+      create({
         id: 'vg-night-70',
         parentId: 'vg-night',
         title: 'Strong',
-        contexts: ['tab'],
-        type: 'radio',
-        checked: false,
+        ...checkedPreset('radio', false),
       });
 
       // Separator before undo
-      browser.menus.create({
+      create({
         id: 'vg-sep',
         parentId: 'vg-root',
         type: 'separator',
-        contexts: ['tab'],
       });
 
       // Undo seek — enabled only when target tab has seek history
-      browser.menus.create({
+      create({
         id: 'vg-seek-undo',
         parentId: 'vg-root',
         title: 'Undo seek',
-        contexts: ['tab'],
-        enabled: false,
+        enabled: isChrome,
       });
     } catch (_) {}
   }
@@ -764,41 +788,32 @@
     }
   }
 
-  browser.menus.onClicked.addListener((info, tab) => {
+  menus.onClicked.addListener(async (info, tab) => {
     const targetTabId = info.tabId != null ? info.tabId : tab ? tab.id : null;
     if (targetTabId == null) return;
+    if (stateReady) await stateReady;
 
     if (info.menuItemId.startsWith('vg-volume-')) {
       const p = parseInt(info.menuItemId.replace('vg-volume-', ''), 10);
       if (!isNaN(p)) {
-        getState(targetTabId).volume = p;
-        broadcast(targetTabId, { type: VC.VOLUME_SET, percent: p, tabId: targetTabId }).catch(
-          () => {},
-        );
-        updateActionTitle(targetTabId, p);
+        await handleVolumeSet({ tabId: targetTabId, percent: p });
       }
     } else if (info.menuItemId.startsWith('vg-speed-')) {
       const s = parseFloat(info.menuItemId.replace('vg-speed-', ''));
       if (!isNaN(s)) {
-        getState(targetTabId).speed = s;
-        broadcast(targetTabId, { type: VC.SPEED_SET, speed: s, tabId: targetTabId }).catch(
-          () => {},
-        );
+        await handleSpeedSet({ tabId: targetTabId, speed: s });
       }
     } else if (info.menuItemId.startsWith('vg-night-')) {
       const n = parseInt(info.menuItemId.replace('vg-night-', ''), 10);
       if (!isNaN(n)) {
-        getState(targetTabId).night = n;
-        broadcast(targetTabId, { type: VC.NIGHT_SET, strength: n, tabId: targetTabId }).catch(
-          () => {},
-        );
+        await handleNightSet({ tabId: targetTabId, strength: n });
       }
     } else if (info.menuItemId === 'vg-seek-undo') {
       handleSeekUndo({ tabId: targetTabId }).catch(() => {});
     }
   });
 
-  browser.menus.onShown.addListener(async (info, tab) => {
+  menus.onShown?.addListener(async (info, tab) => {
     const targetTabId = info.tabId != null ? info.tabId : tab ? tab.id : null;
     if (targetTabId == null) return;
 
@@ -865,12 +880,27 @@
   });
 
   // --- Init ---
-  createMenus();
-
-  browser.tabs
-    .query({})
-    .then((tabs) => {
-      for (const tab of tabs) showPageAction(tab.id, tab.url);
-    })
-    .catch(() => {});
+  if (isChrome) {
+    // Chrome persists these registrations across worker restarts.
+    browser.runtime.onInstalled.addListener(() => {
+      menus.removeAll().then(createMenus).catch(console.error);
+      const { onPageChanged, PageStateMatcher, ShowAction } = browser.declarativeContent;
+      onPageChanged.removeRules(undefined, () => {
+        onPageChanged.addRules([
+          {
+            conditions: [new PageStateMatcher({ pageUrl: { schemes: ['http', 'https'] } })],
+            actions: [new ShowAction()],
+          },
+        ]);
+      });
+    });
+  } else {
+    createMenus();
+    browser.tabs
+      .query({})
+      .then((tabs) => {
+        for (const tab of tabs) showPageAction(tab.id, tab.url);
+      })
+      .catch(() => {});
+  }
 })();

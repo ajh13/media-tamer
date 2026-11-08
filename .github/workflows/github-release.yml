@@ -1,110 +1,185 @@
-name: GitHub Release
+name: Release Media Tamer
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
     paths:
       - extensions/media-tamer/manifest.json
   workflow_dispatch:
+    inputs:
+      target:
+        description: 'Release destination for the selected main commit'
+        type: choice
+        default: all
+        options:
+          - all
+          - github
+          - firefox
+          - firefox-unlisted
+          - chrome
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  group: github-release-main
+  group: media-tamer-release
   cancel-in-progress: false
 
 jobs:
-  release:
-    name: Validate and publish unsigned ZIP
+  build:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
-      - name: Check out repository and tags
+      - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
-      - name: Check manifest version and release tag
+      - name: Check for a new manifest version
         id: version
         env:
           BEFORE_SHA: ${{ github.event.before }}
           EVENT_NAME: ${{ github.event_name }}
-          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          version="$(node -p "require('./extensions/media-tamer/manifest.json').version")"
+          manifest=extensions/media-tamer/manifest.json
+          version="$(node -p "require('./$manifest').version")"
           if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
             echo "Invalid extension version: $version" >&2
             exit 1
           fi
-          tag="v$version"
           if [[ "$EVENT_NAME" == push && "$BEFORE_SHA" != 0000000000000000000000000000000000000000 ]]; then
-            previous="$(git show "$BEFORE_SHA:extensions/media-tamer/manifest.json" | node -pe "JSON.parse(require('fs').readFileSync(0, 'utf8')).version" 2>/dev/null || true)"
+            previous="$(git show "$BEFORE_SHA:$manifest" | node -pe "JSON.parse(require('fs').readFileSync(0, 'utf8')).version")"
             if [[ "$version" == "$previous" ]]; then
-              echo "Manifest version unchanged ($version); no release."
+              echo "Manifest version unchanged ($version)."
               exit 0
             fi
           fi
-          if gh release view "$tag" >/dev/null 2>&1; then
-            echo "Release $tag already exists; no duplicate."
-            exit 0
-          fi
-          if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
-            tagged_sha="$(git rev-list -n 1 "$tag")"
-            if [[ "$tagged_sha" != "$GITHUB_SHA" ]]; then
-              echo "Tag $tag already points to $tagged_sha, not $GITHUB_SHA; refusing to retag." >&2
-              exit 1
-            fi
-          fi
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Set up Node.js
-        if: steps.version.outputs.tag != ''
+        if: steps.version.outputs.version != ''
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '24'
           cache: npm
 
-      - name: Install dependencies
-        if: steps.version.outputs.tag != ''
-        run: npm ci
+      - name: Validate and test both extensions
+        if: steps.version.outputs.version != ''
+        run: |
+          npm ci
+          npm run lint
+          npm run format:check
+          npm test
+          npm audit --omit=dev --audit-level=high
+          npx playwright install --with-deps firefox chromium
+          npm run test:browser
+          npm run test:chrome
 
-      - name: Lint and validate extension
-        if: steps.version.outputs.tag != ''
-        run: npm run lint && npm run format:check
+      - name: Upload unsigned packages
+        if: steps.version.outputs.version != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: media-tamer-unsigned
+          path: dist/*.zip
+          if-no-files-found: error
 
-      - name: Run unit tests
-        if: steps.version.outputs.tag != ''
-        run: npm test
-
-      - name: Install Firefox for Playwright
-        if: steps.version.outputs.tag != ''
-        run: npx playwright install --with-deps firefox
-
-      - name: Run browser tests
-        if: steps.version.outputs.tag != ''
-        run: npm run test:browser
-
-      - name: Audit production dependencies
-        if: steps.version.outputs.tag != ''
-        run: npm audit --omit=dev --audit-level=high
-
-      - name: Build unsigned extension
-        if: steps.version.outputs.tag != ''
-        run: npm run build
+  github-release:
+    needs: build
+    if: needs.build.outputs.version != '' && (github.event_name == 'push' || inputs.target == 'all' || inputs.target == 'github')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: media-tamer-unsigned
+          path: dist
 
       - name: Publish GitHub release
-        if: steps.version.outputs.tag != ''
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ steps.version.outputs.tag }}
-          VERSION: ${{ steps.version.outputs.version }}
+          VERSION: ${{ needs.build.outputs.version }}
         run: |
           set -euo pipefail
-          gh release create "$TAG" "dist/media_tamer-$VERSION.zip" \
+          tag="v$VERSION"
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $tag already exists."
+            exit 0
+          fi
+          if tagged_sha="$(gh api "repos/$GITHUB_REPOSITORY/commits/$tag" --jq .sha 2>/dev/null)" && [[ "$tagged_sha" != "$GITHUB_SHA" ]]; then
+            echo "Tag $tag already points to $tagged_sha. Expected $GITHUB_SHA." >&2
+            exit 1
+          fi
+          gh release create "$tag" "dist/media_tamer-$VERSION.zip" "dist/media_tamer-chrome-$VERSION.zip" \
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
-            --title "$TAG" \
+            --title "$tag" \
             --generate-notes
+
+  firefox:
+    needs: build
+    if: needs.build.outputs.version != '' && (github.event_name == 'push' || inputs.target == 'all' || inputs.target == 'firefox' || inputs.target == 'firefox-unlisted')
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+
+      - name: Submit to Mozilla Add-ons
+        env:
+          AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
+          AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+          TARGET: ${{ inputs.target }}
+        run: |
+          set -euo pipefail
+          trim() { printf '%s' "$1" | tr -d '\r\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'; }
+          export AMO_JWT_ISSUER="$(trim "$AMO_JWT_ISSUER")"
+          export AMO_JWT_SECRET="$(trim "$AMO_JWT_SECRET")"
+          if [[ -z "$AMO_JWT_ISSUER" || -z "$AMO_JWT_SECRET" ]]; then
+            echo 'Set the AMO_JWT_ISSUER and AMO_JWT_SECRET Actions secrets.' >&2
+            exit 1
+          fi
+          if [[ "$TARGET" == firefox-unlisted ]]; then
+            npm run sign:amo:unlisted
+          else
+            npm run sign:amo:listed
+          fi
+
+      - name: Upload signed unlisted package
+        if: inputs.target == 'firefox-unlisted'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: media-tamer-signed
+          path: dist/amo/*.xpi
+          if-no-files-found: error
+
+  chrome:
+    needs: build
+    if: needs.build.outputs.version != '' && (github.event_name == 'push' || inputs.target == 'all' || inputs.target == 'chrome')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: media-tamer-unsigned
+          path: dist
+
+      - name: Submit to Chrome Web Store
+        env:
+          CWS_PUBLISHER_ID: ${{ vars.CWS_PUBLISHER_ID }}
+          CWS_EXTENSION_ID: ${{ vars.CWS_EXTENSION_ID }}
+          CWS_CLIENT_ID: ${{ secrets.CWS_CLIENT_ID }}
+          CWS_CLIENT_SECRET: ${{ secrets.CWS_CLIENT_SECRET }}
+          CWS_REFRESH_TOKEN: ${{ secrets.CWS_REFRESH_TOKEN }}
+          VERSION: ${{ needs.build.outputs.version }}
+        run: node scripts/publish-chrome.mjs "$VERSION"

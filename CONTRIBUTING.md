@@ -23,7 +23,7 @@ npm run format:check
 # Auto-format
 npm run format
 
-# Build extension package (unsigned .zip in dist/)
+# Build both extensions (unsigned ZIPs in dist/)
 npm run build
 
 # Dependency audit (dev-only, high severity+)
@@ -31,6 +31,9 @@ npm run audit
 
 # Browser tests — real Firefox via Playwright (requires Firefox binary)
 npm run test:browser
+
+# Installed Chrome extension tests
+npm run test:chrome
 ```
 
 End-to-end tests live in `test/e2e/` with their own lockfile and pinned harness. That suite is **still evolving** and runs in isolation — see `docs/e2e.md` and `test/e2e/` for its current status before relying on it.
@@ -38,8 +41,8 @@ End-to-end tests live in `test/e2e/` with their own lockfile and pinned harness.
 ## Requirements
 
 - Node.js 24 (CI), npm 12+
-- Firefox binary installed for browser tests
-  (`npx playwright install --with-deps firefox`)
+- Playwright browser binaries installed for browser tests
+  (`npx playwright install --with-deps firefox chromium`)
 
 ## Code style
 

@@ -1,7 +1,7 @@
 {
   "name": "media-tamer",
   "version": "1.0.0",
-  "description": "Media Tamer \u2014 Firefox browser extension for video playback control (volume boost, speed, night mode, seek undo, media-roller download).",
+  "description": "Media Tamer — Firefox and Chrome browser extension for video playback control (volume boost, speed, night mode, seek undo, media-roller download).",
   "private": false,
   "type": "module",
   "scripts": {
@@ -16,8 +16,9 @@
     "audit": "npm audit --omit=dev",
     "audit:full": "npm audit",
     "build": "node scripts/build.cjs",
-    "sign:amo:listed": "npx --yes web-ext@latest sign --source-dir extensions/media-tamer --artifacts-dir dist/amo --channel=listed --amo-metadata amo-metadata.json --api-key=\"$AMO_JWT_ISSUER\" --api-secret=\"$AMO_JWT_SECRET\" --approval-timeout=3600000 --no-input",
-    "sign:amo:unlisted": "npx --yes web-ext@latest sign --source-dir extensions/media-tamer --artifacts-dir dist/amo --channel=unlisted --api-key=\"$AMO_JWT_ISSUER\" --api-secret=\"$AMO_JWT_SECRET\" --approval-timeout=3600000 --no-input"
+    "sign:amo:listed": "npx --yes web-ext@10.8.0 sign --source-dir extensions/media-tamer --artifacts-dir dist/amo --channel=listed --amo-metadata amo-metadata.json --api-key=\"$AMO_JWT_ISSUER\" --api-secret=\"$AMO_JWT_SECRET\" --approval-timeout=0 --no-input",
+    "sign:amo:unlisted": "npx --yes web-ext@10.8.0 sign --source-dir extensions/media-tamer --artifacts-dir dist/amo --channel=unlisted --api-key=\"$AMO_JWT_ISSUER\" --api-secret=\"$AMO_JWT_SECRET\" --approval-timeout=3600000 --no-input",
+    "test:chrome": "npm run build && node --test test/browser/chrome-extension.test.js"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",

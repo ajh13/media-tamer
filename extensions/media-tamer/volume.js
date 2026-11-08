@@ -25,9 +25,6 @@
   const VC_NIGHT_SET = 'VC_NIGHT_SET';
   const VC_NIGHT_GET = 'VC_NIGHT_GET';
 
-  // --- Extension ID (must match manifest.json gecko.id) ---
-  const EXT_ID = 'media-tamer@example.invalid';
-
   // --- Constants ---
   const MIN_PERCENT = 0;
   const MAX_PERCENT = 300;
@@ -56,7 +53,7 @@
   // --- Sender validation ---
   function isValidSender(sender) {
     if (!sender || typeof sender !== 'object') return false;
-    return sender.id === EXT_ID;
+    return sender.id === browser.runtime.id;
   }
 
   // --- Validation ---

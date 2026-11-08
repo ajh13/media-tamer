@@ -33,9 +33,6 @@ describe('Media Tamer branding — manifest identity', () => {
   test('manifest description retained', () => {
     assert.match(manifest.description, /Prevent accidental number-key seeks/);
   });
-  test('manifest version bumped to 1.2.2 (new branding release)', () => {
-    assert.equal(manifest.version, '1.2.2');
-  });
   test('gecko.id preserved as media-tamer@example.invalid', () => {
     assert.equal(manifest.browser_specific_settings.gecko.id, 'media-tamer@example.invalid');
   });
@@ -79,8 +76,8 @@ describe('Media Tamer branding — build artifact', () => {
 });
 
 describe('Media Tamer branding — docs', () => {
-  test('README.md title is "Media Tamer — Firefox Extension"', () => {
-    assert.match(readme, /# Media Tamer — Firefox Extension/);
+  test('README.md title is "Media Tamer — Browser Extension"', () => {
+    assert.match(readme, /# Media Tamer — Browser Extension/);
     assert.match(readme, /dist\/media_tamer-<version>\.zip/);
   });
   test('DESIGN.md title references Media Tamer', () => {
