@@ -588,6 +588,7 @@
       tabId,
     });
 
+    await saved;
     updateActionTitle(tabId, DEF.VOLUME);
 
     return {
